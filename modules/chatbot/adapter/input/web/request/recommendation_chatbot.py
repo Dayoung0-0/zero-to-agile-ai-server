@@ -34,7 +34,10 @@ class RecommendationChatbotRequest(BaseModel):
         default=ChatTone.FORMAL,
         description="답변 말투 (기본: 존댓말)",
     )
-    message: str = Field(..., description="사용자 질문 또는 요청")
+    message: Optional[str] = Field(
+        default=None,
+        description="추가 조건: null일 경우 빈 문자열로 처리.",
+    )
     recommendations: Optional[List[RecommendationItem]] = Field(
         default=None,
         description="추천된 매물 요약",
