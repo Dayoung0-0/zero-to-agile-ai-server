@@ -31,7 +31,7 @@ class ExplainRecommendationUseCase:
             return f"요청 메시지를 확인했습니다: {request.message}"
 
         for item in request.recommendations:
-            item.reasons = self._llm_port.generate_reasons(item, request.message)
+            item.reasons = self._llm_port.generate_reasons(item, request.message or "")
 
         formatted_items = []
         for item in request.recommendations:

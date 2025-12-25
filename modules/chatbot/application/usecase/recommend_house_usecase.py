@@ -29,7 +29,7 @@ class RecommendHouseUseCase:
                 item_id="sample-1",
                 title="추천 매물",
                 reasons=[
-                    request.message,
+                    request.message or "",
                     preference_summary,
                 ],
             )
