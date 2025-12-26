@@ -79,6 +79,7 @@ def start_search_house_consumer():
             embedder,
         )
 
+
         print(f"[Consumer] before b-logic search_house_id={search_house_id}")
         ai_agent = StudentHouseRecommendationAgent(usecase)
         print(f"[Consumer] after b-logic search_house_id={search_house_id}")
