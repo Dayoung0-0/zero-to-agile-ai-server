@@ -209,6 +209,7 @@ class HousePlatformRepository(HousePlatformRepositoryPort):
                 options.near_univ,
                 options.near_transport,
                 options.near_mart,
+                options.nearby_pois,
             )
         )
         if not has_payload:
@@ -221,6 +222,7 @@ class HousePlatformRepository(HousePlatformRepositoryPort):
             "near_univ": options.near_univ,
             "near_transport": options.near_transport,
             "near_mart": options.near_mart,
+            "nearby_pois": options.nearby_pois,
         }
 
         existing = (
