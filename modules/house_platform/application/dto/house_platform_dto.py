@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Mapping, Sequence
+from typing import Any, Mapping, Sequence
 
 from modules.house_platform.domain.value_object.house_platform_domain import (
     HousePlatformDomainType,
@@ -18,6 +18,7 @@ class HousePlatformUpsertModel:
     deposit: int | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
+    registered_at: datetime | None = None
     domain_id: int | HousePlatformDomainType | None = HousePlatformDomainType.ZIGBANG
     rgst_no: str | None = None
     pnu_cd: str | None = None
@@ -35,6 +36,8 @@ class HousePlatformUpsertModel:
     can_park: bool | None = None
     has_elevator: bool | None = None
     image_urls: Sequence[str] | None = None
+    gu_nm: str | None = None
+    dong_nm: str | None = None
 
 
 @dataclass
@@ -59,3 +62,4 @@ class HousePlatformOptionUpsertModel:
     near_univ: bool | None = None
     near_transport: bool | None = None
     near_mart: bool | None = None
+    nearby_pois: Sequence[Mapping[str, Any]] | None = None
