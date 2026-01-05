@@ -11,6 +11,7 @@ from modules.mq.adapter.input.web.router.search_house_router import router as se
 from modules.student_house.adapter.input.web.router.student_house_router import (
     router as student_house_router,
 )
+from modules.abang_user.adapter.input.web.router.abang_user_router import router as abang_user_router
 
 load_dotenv()
 app = FastAPI()
@@ -43,6 +44,9 @@ api_router.include_router(chatbot_router)
 
 # ✅ student_house_router를 api_router 아래에 등록 (/api + /student_house = /api/student_house)
 api_router.include_router(student_house_router)
+
+# ✅ abang_user_router를 api_router 아래에 등록 (/api + /users = /api/users)
+api_router.include_router(abang_user_router)
 
 # 등록한 /api 라우터를 메인 앱에 연결합니다.
 app.include_router(api_router)
