@@ -4,10 +4,10 @@ from typing import List
 
 from openai import OpenAI
 
-from modules.chatbot.adapter.input.web.request.recommendation_chatbot import (
+from modules.ai_explaination.adapter.input.web.request.recommendation_chatbot import (
     RecommendationItem,
 )
-from modules.chatbot.application.port.llm_port import LLMPort
+from modules.ai_explaination.application.port.llm_port import LLMPort
 
 
 class LLMAdapter(LLMPort):
