@@ -1,11 +1,13 @@
 """
-건축물대장 API Repository 구현체
+Building ledger API repository.
 """
 import xml.etree.ElementTree as ET
-import requests
 from datetime import datetime
 import os as os_module
+
+import requests
 from dotenv import load_dotenv
+
 from modules.house_analysis.application.port.building_ledger_port import BuildingLedgerPort
 from modules.house_analysis.domain.exception import BuildingInfoNotFoundError
 
@@ -14,137 +16,108 @@ load_dotenv()
 
 class BuildingLedgerRepository(BuildingLedgerPort):
     """
-    건축물대장 정보를 조회하는 Repository
-    공공데이터포털 건축물대장 API 사용
+    Repository to fetch building ledger information.
     """
 
     def __init__(self):
-        """Initialize the Building Ledger API client."""
         self.api_key = os_module.getenv("PUBLIC_DATA_API_KEY", "")
-        self.endpoint = "https://apis.data.go.kr/1613000/BldRgstHubService/getBrTitleInfo"
-        self.timeout = 10  # seconds
+        self.endpoint = (
+            "https://apis.data.go.kr/1613000/BldRgstHubService/getBrTitleInfo"
+        )
+        self.timeout = 10
 
     def fetch_building_info(self, legal_code: str, bun: str, ji: str) -> dict:
         """
-        법정동코드로 건축물 정보 조회
-
-        Args:
-            legal_code: 법정동코드 (10자리, 예: 1168010100)
-                       앞5자리: 시군구코드, 뒤5자리: 법정동코드
-            bun: 번 (4자리)
-            ji: 지 (4자리)
-
-        Returns:
-            dict: 건축물정보 (is_violation, has_seismic_design, building_age)
-
-        Raises:
-            BuildingInfoNotFoundError: 건축물정보를 찾을 수 없는 경우
+        Fetch building info by legal code and bun/ji.
         """
-        # 법정동코드를 시군구코드와 법정동코드로 분리
         if len(legal_code) != 10:
-            raise ValueError(f"법정동코드는 10자리여야 합니다: {legal_code}")
+            raise ValueError(f"legal_code must be 10 digits: {legal_code}")
 
-        sigungu_cd = legal_code[:5]  # 앞5자리
-        bjdong_cd = legal_code[5:]   # 뒤5자리
+        sigungu_cd = legal_code[:5]
+        bjdong_cd = legal_code[5:]
 
-        # 번/지 값을 4자리 패딩
         bun = str(bun).zfill(4)
         ji = str(ji).zfill(4)
 
-        # API 호출
         try:
             params = {
-                'serviceKey': self.api_key,
-                'sigunguCd': sigungu_cd,
-                'bjdongCd': bjdong_cd,
-                'bun': bun,
-                'ji': ji,
-                'numOfRows': 1,
-                'pageNo': 1
+                "serviceKey": self.api_key,
+                "sigunguCd": sigungu_cd,
+                "bjdongCd": bjdong_cd,
+                "bun": bun,
+                "ji": ji,
+                "numOfRows": 1,
+                "pageNo": 1,
             }
 
             response = requests.get(
                 self.endpoint,
                 params=params,
-                timeout=self.timeout
+                timeout=self.timeout,
             )
             response.raise_for_status()
 
-            # XML 파싱
             return self._parse_xml_response(response.text)
 
         except requests.Timeout:
-            raise BuildingInfoNotFoundError(f"API 요청 시간 초과: {legal_code}")
-        except requests.RequestException as e:
-            raise BuildingInfoNotFoundError(f"API 요청 실패: {str(e)}")
+            raise BuildingInfoNotFoundError(
+                f"API request timeout: {legal_code}"
+            )
+        except requests.RequestException as exc:
+            raise BuildingInfoNotFoundError(f"API request failed: {exc}")
 
     def _parse_xml_response(self, xml_text: str) -> dict:
         """
-        XML 응답을 파싱하여 필요한 정보 추출
-
-        Args:
-            xml_text: XML 응답 텍스트
-
-        Returns:
-            dict: 건축물정보
+        Parse XML response into building info.
         """
         try:
             root = ET.fromstring(xml_text)
 
-            # 에러 체크
-            header = root.find('header')
+            header = root.find("header")
             if header is not None:
-                result_code = header.findtext('resultCode', '')
-                result_msg = header.findtext('resultMsg', '')
+                result_code = header.findtext("resultCode", "")
+                result_msg = header.findtext("resultMsg", "")
 
-                if result_code != '00':
+                if result_code != "00":
                     raise BuildingInfoNotFoundError(
-                        f"API 에러 (코드: {result_code}, 메시지: {result_msg})"
+                        f"API error (code: {result_code}, msg: {result_msg})"
                     )
 
-            # 건축물데이터 추출
-            body = root.find('body')
+            body = root.find("body")
             if body is None:
-                raise BuildingInfoNotFoundError("응답에 body가 없습니다")
+                raise BuildingInfoNotFoundError("response body is missing")
 
-            items = body.find('items')
+            items = body.find("items")
             if items is None:
-                raise BuildingInfoNotFoundError("응답에 items가 없습니다")
+                raise BuildingInfoNotFoundError("response items is missing")
 
-            item = items.find('item')
+            item = items.find("item")
             if item is None:
-                raise BuildingInfoNotFoundError("건축물데이터를 찾을 수 없습니다")
+                raise BuildingInfoNotFoundError("building item not found")
 
-            # 주요 필드 추출 및 변환
-            # 위반 건축물 여부 (vlRat: 위반건축물여부)
-            vl_rat_yn = item.findtext('vlRatEstbYn', 'N')  # 위반건축물여부
-            is_violation = vl_rat_yn.upper() == 'Y'
+            vl_rat_yn = item.findtext("vlRatEstbYn", "N")
+            is_violation = vl_rat_yn.upper() == "Y"
 
-            # 실제로는 useAprDay(사용승인일)로 내진설계 의무화 시점 기준 판단
-            use_apr_day = item.findtext('useAprDay', '')  # 사용승인일(YYYYMMDD)
-
-            # 1988년 이후 건물은 내진설계 의무화 (간단한 기준)
+            use_apr_day = item.findtext("useAprDay", "")
             has_seismic_design = False
             if use_apr_day and len(use_apr_day) >= 4:
                 year = int(use_apr_day[:4])
                 has_seismic_design = year >= 1988
 
-            # 건물 연령 계산
             building_age = 0
             if use_apr_day and len(use_apr_day) >= 4:
                 year = int(use_apr_day[:4])
                 current_year = datetime.now().year
                 building_age = current_year - year
 
-            # 주용도코드명
-            main_use = item.findtext('mainPurpsCdNm', '').strip()
+            main_use = item.findtext("mainPurpsCdNm", "").strip()
 
             return {
                 "is_violation": is_violation,
                 "has_seismic_design": has_seismic_design,
                 "building_age": building_age,
-                "main_use": main_use
+                "main_use": main_use,
             }
 
-        except ET.ParseError as e:
-            raise BuildingInfoNotFoundError(f"XML 파싱 실패: {str(e)}")
+        except ET.ParseError as exc:
+            raise BuildingInfoNotFoundError(f"XML parse error: {exc}")
