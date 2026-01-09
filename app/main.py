@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 # ✨ 이 줄 추가
 from modules.auth.adapter.input.web.auth_router import router as auth_router
 from modules.finder_request.adapter.input.web.router.finder_request_router import router as finder_request_router
-from modules.ai_explaination.adapter.input.web.router.chatbot import router as chatbot_router
+from modules.ai_explaination.adapter.input.web.router.ai_explaination import router as chatbot_router
 from modules.mq.adapter.input.web.router.search_house_router import router as search_house_router
 from modules.student_house.adapter.input.web.router.student_house_router import (
     router as student_house_router,

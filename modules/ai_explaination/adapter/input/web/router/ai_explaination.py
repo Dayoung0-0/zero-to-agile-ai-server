@@ -3,9 +3,6 @@ from fastapi import APIRouter
 from modules.ai_explaination.adapter.input.web.request.recommendation_explaination import (
     RecommendationChatbotRequest,
 )
-from modules.ai_explaination.adapter.input.web.response.recommendation_chatbot import (
-    RecommendationChatbotResponse,
-)
 from modules.ai_explaination.application.usecase.explain_recommendation_usecase import (
     ExplainRecommendationUseCase,
 )
