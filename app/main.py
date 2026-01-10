@@ -9,6 +9,7 @@ from modules.finder_request.adapter.input.web.router.finder_request_router impor
 #from modules.chatbot.adapter.input.web.router.chatbot import router as chatbot_router
 from modules.mq.adapter.input.web.router.search_house_router import router as search_house_router
 from modules.utils.address_autocomplete.router.address_autocomplete_router import router as address_autocomplete
+from modules.observations_assistance.adapter.input.router.building_ledger_batch_router import router as building_ledger_batch_router
 
 
 load_dotenv()
@@ -33,10 +34,11 @@ api_router = APIRouter(prefix="/api")
 # ✅ auth_router를 api_router 아래에 등록 (/api + /auth = /api/auth)
 api_router.include_router(auth_router)
 api_router.include_router(search_house_router)
+api_router.include_router(address_autocomplete)
+api_router.include_router(building_ledger_batch_router)
 
 # ✅ finder_request_router를 api_router 아래에 등록 (/api + /requests = /api/requests)
 api_router.include_router(finder_request_router)
-api_router.include_router(address_autocomplete)
 
 # ✅ chatbot_router를 api_router 아래에 등록 (/api + /chatbot = /api/chatbot)
 #api_router.include_router(chatbot_router)
