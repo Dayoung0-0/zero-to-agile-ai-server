@@ -18,7 +18,7 @@ class LLMAdapter(LLMPort):
         self._client = OpenAI(api_key=self._api_key)
         self._model = model or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
-    def generate_reasons(
+    def finder_recommendation_reasons(
             self,
             recommendation: RecommendationItem,
             query_summary: str,
@@ -66,6 +66,51 @@ class LLMAdapter(LLMPort):
         if tone == "casual":
             return ["추천 이유를 생성하지 못했어."]
         return ["추천 이유를 생성하지 못했습니다."]
+
+        # 2. 신규 메서드 (임대인에게 세입자 추천)
+     def owner_recommendation_reasons(
+                self,
+                house: RecommendationItem,
+                tenant: TenantCandidateItem,
+                tone: str = "formal"
+        ) -> List[str]:
+
+            tone_instruction = "정중한 해요체(~해요)로" if tone != "casual" else "친근한 반말(~야)로"
+
+            # 임대인용 프롬프트 설계
+            response = self._client.chat.completions.create(
+                model=self._model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            f"당신은 임대 관리 전문가입니다. {tone_instruction} "
+                            "임대인의 매물 정보와 세입자 후보 정보를 비교하여, "
+                            "임대인에게 '이 세입자를 받아야 하는 이유'를 설득력 있게 설명하세요. "
+                            "월세 지불 능력(예산)과 거주 성향을 중심으로 3가지 이유를 작성하세요. "
+                            "출력은 반드시 JSON 배열([\"이유1\", \"이유2\"]) 형태여야 합니다."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": (
+                            f"[내 매물 정보]\n"
+                            f"- 월세: {house.monthly_rent}만원 (보증금 {house.deposit})\n"
+                            f"- 매물명: {house.title}\n\n"
+                            f"[세입자 후보]\n"
+                            f"- 직업: {tenant.job_status}\n"
+                            f"- 희망 예산: 월세 {tenant.budget_monthly}만원\n"
+                            f"- 학교: {tenant.university}\n"
+                            f"- 특징: {', '.join(tenant.lifestyle_tags)}\n\n"
+                            "위 정보를 바탕으로 추천 사유를 JSON 배열로 생성하세요."
+                        ),
+                    },
+                ],
+                temperature=0.3,
+            )
+
+            content = response.choices[0].message.content or "[]"
+            return self._parse_reason_list(content)
 
     def _parse_reason_list(self, content: str) -> List[str]:
         try:

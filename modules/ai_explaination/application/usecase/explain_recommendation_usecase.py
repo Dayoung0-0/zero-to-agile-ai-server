@@ -1,5 +1,5 @@
 from modules.ai_explaination.adapter.input.web.request.recommendation_explaination import (
-    RecommendationChatbotRequest,
+    RecommendationExplainationRequest,
     RecommendationItem,
 )
 from modules.ai_explaination.adapter.input.web.response.recommendation_chatbot import (
@@ -16,12 +16,12 @@ class ExplainRecommendationUseCase:
 
     def execute(
         self,
-        request: RecommendationChatbotRequest,
+        request: RecommendationExplainationRequest,
     ) -> RecommendationChatbotResponse:
         explanation = self._build_explanation(request)
         return RecommendationChatbotResponse(message=explanation)
 
-    def _build_explanation(self, request: RecommendationChatbotRequest) -> str:
+    def _build_explanation(self, request: RecommendationExplainationRequest) -> str:
         base_message = self._format_recommendations(request)
 
         # 말투에 따라 인사말 선택
@@ -32,7 +32,7 @@ class ExplainRecommendationUseCase:
 
         return f"{greeting} {base_message}"
 
-    def _format_recommendations(self, request: RecommendationChatbotRequest) -> str:
+    def _format_recommendations(self, request: RecommendationExplainationRequest) -> str:
         if not request.recommendations:
             if request.tone == ChatTone.CASUAL:
                 return f"요청 메시지를 확인했어: {request.message}"
@@ -93,7 +93,7 @@ class ExplainRecommendationUseCase:
             except Exception:
                 return []
 
-        return self._llm_port.generate_reasons(item, query_summary)
+        return self._llm_port.finder_recommendation_reasons(item, query_summary)
 
     def _deduplicate_reasons(self, reasons: list[str]) -> list[str]:
         seen: set[str] = set()
