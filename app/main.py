@@ -20,7 +20,7 @@ from modules.abang_user.adapter.input.web.router.abang_user_router import router
 from modules.university.adapter.input.web.router.university_router import router as university_router
 from modules.house_platform.adapter.input.web.router.house_platform_router import router as house_platform_router
 from modules.send_message.adapter.input.web.router.send_message_router import router as send_message_router
-from modules.ai_explanation.adapter.input.web.router import finder_router, owner_router
+from modules.ai_explanation.adapter.input.web.router import explain_router
 from modules.owner_recommendation.adapter.input.web.router.owner_recommendation_router import (
     router as owner_recommendation_router,
 )
@@ -52,8 +52,7 @@ api_router.include_router(search_house_router)
 api_router.include_router(finder_request_router)
 
 # ✅ ai_explanation를 api_router 아래에 등록 (/api + /explain = /api/explain)
-app.include_router(finder_router.router, prefix="/api/explain") # POST /api/explain/finder
-app.include_router(owner_router.router, prefix="/api/explain")  # POST /api/explain/owner
+api_router.include_router(explain_router)
 
 # ✅ student_house_router를 api_router 아래에 등록 (/api + /student_house = /api/student_house)
 # TODO: 추천 로직이 완성되면 라우터 등록을 복구한다.
