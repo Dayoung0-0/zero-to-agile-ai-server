@@ -1,31 +1,36 @@
+from typing import Optional
 from pydantic import BaseModel, Field
 from modules.ai_explanation.domain.tone import ChatTone
 
 
-# [1] 내 건물 정보
+# [1] 임대인 건물 정보
 class OwnerHouseData(BaseModel):
-    title: str = Field(..., description="매물 이름 (예: 신림동 신축 원룸)")
-    monthly_rent: int = Field(..., description="월세 (예: 500000)")
-    deposit: int = Field(..., description="보증금 (예: 5000000)")
+    house_platform_id: int = Field(..., description="매물 ID")
+    title: str = Field(..., description="매물 이름")
     address: str = Field(..., description="주소")
-    room_type: str = Field(..., description="방 종류 (OPEN=원룸 등)")
+    sales_type: str = Field(..., description="판매 유형 (예: MONTHLY)")
+    residence_type: str = Field(..., description="주거 형태 (예: ONE_ROOM)")
+    monthly_rent: int = Field(..., description="월세")
+    deposit: int = Field(..., description="보증금")
+    room_type: str = Field(..., description="방 종류 (예: OPEN)")
+    gu_nm: str = Field(..., description="자치구 명 (예: 관악구)")  # 지역 매칭 로직에 필요
+    dong_nm: str = Field(..., description="법정동 명 (예: 신림동)")  # 지역 매칭 로직에 필요
 
 
 # [2] 세입자 후보 정보
-class TenantCandidateData(BaseModel):
+class MatchedFinderRequestData(BaseModel):
     finder_request_id: int
+    abang_user_id: int = Field(..., description="세입자 유저 ID")
     price_type: str = Field(..., description="선호 거래 유형 (MONTHLY 등)")
-    max_rent: int = Field(..., description="세입자 최대 월세 예산")
-    preferred_region: str = Field(..., description="세입자 선호 지역")
-    house_type: str = Field(..., description="세입자 선호 주거 형태")
+    house_type: str = Field(..., description="선호 주거 형태")
+    max_rent: int = Field(..., description="최대 월세 예산")
+    preferred_region: str = Field(..., description="선호 지역")
 
 
-# 임대인용 설명 요청
+# 최종 요청 Body
 class OwnerExplanationRequest(BaseModel):
-    tone: ChatTone = Field(default=ChatTone.FORMAL)  # 기본값: 정중한 어조
+    tone: ChatTone = Field(default=ChatTone.FORMAL)
 
-    # 내 건물 정보
-    my_house: OwnerHouseData
+    owner_house: OwnerHouseData
 
-    # 추천된 세입자 후보 1명 (리스트 중 사용자가 클릭한 특정 후보)
-    finders: TenantCandidateData
+    finders: MatchedFinderRequestData
