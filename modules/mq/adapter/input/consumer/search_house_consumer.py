@@ -111,7 +111,7 @@ def start_search_house_consumer():
     channel.basic_consume(
         queue=QUEUE_NAME,
         on_message_callback=callback,
-        auto_ack=False
+        auto_ack=True
     )
 
     print("[consumer] start_consuming() now...")
