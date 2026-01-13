@@ -18,6 +18,7 @@ from modules.recommendations.application.port_in.recommend_student_house_port im
     RecommendStudentHousePort,
 )
 from infrastructure.db.postgres import SessionLocal
+from infrastructure.db.session_helper import open_session
 from modules.decision_context_signal_builder.application.usecase.build_decision_context_signal_usecase import (
     BuildDecisionContextSignalUseCase,
 )
@@ -89,136 +90,207 @@ class RecommendStudentHouseUseCase(RecommendStudentHousePort):
         filter_usecase: FilterCandidatePort | None = None,
         build_context_signal_usecase=None,
         policy: DecisionPolicyConfig | None = None,
+        session_factory=SessionLocal,
     ):
-        # 인자가 없으면 기본 구현체로 자체 조립한다.
+        # 인자가 없으면 execute에서 기본 구현체를 조립한다.
         # TODO: 의존성 조립을 별도 팩토리로 분리한다.
-        shared_session = None
-        if (
-            finder_request_repo is None
-            or price_observation_repo is None
-            or distance_observation_repo is None
-        ):
-            shared_session = SessionLocal()
-
-        self.finder_request_repo = finder_request_repo or FinderRequestRepository(
-            shared_session
-        )
-        self.house_platform_repo = house_platform_repo or HousePlatformRepository()
-        self.observation_repo = (
-            observation_repo
-            or StudentRecommendationFeatureObservationRepository(SessionLocal)
-        )
-        self.score_repo = score_repo or StudentHouseScoreRepository()
-        self.price_observation_repo = (
-            price_observation_repo
-            or StudentRecommendationPriceObservationRepository(shared_session)
-        )
-        self.distance_observation_repo = (
-            distance_observation_repo
-            or StudentRecommendationDistanceObservationRepository(shared_session)
-        )
-        self.university_repo = university_repo or UniversityRepository(SessionLocal)
-        self.filter_usecase = filter_usecase or FilterCandidateService(
-            finder_request_repo=self.finder_request_repo,
-            house_platform_repo=HousePlatformCandidateRepository(),
-            price_observation_repo=self.price_observation_repo,
-            distance_observation_repo=self.distance_observation_repo,
-            university_repo=self.university_repo,
-        )
-        self.build_context_signal_usecase = (
-            build_context_signal_usecase
-            or BuildDecisionContextSignalUseCase(
-                observation_repo=self.observation_repo
-            )
-        )
+        self.finder_request_repo = finder_request_repo
+        self.house_platform_repo = house_platform_repo
+        self.observation_repo = observation_repo
+        self.score_repo = score_repo
+        self.price_observation_repo = price_observation_repo
+        self.distance_observation_repo = distance_observation_repo
+        self.university_repo = university_repo
+        self.filter_usecase = filter_usecase
+        self.build_context_signal_usecase = build_context_signal_usecase
         self.policy = policy or DecisionPolicyConfig()
-        self._shared_session = shared_session
+        self._session_factory = session_factory
 
     def execute(self, command: RecommendStudentHouseCommand) -> RecommendStudentHouseResult:
         """추천 결과를 생성한다."""
-        request = self.finder_request_repo.find_by_id(command.finder_request_id)
-        # finder_request는 상위 흐름에서 존재를 보장한다.
+        session = None
+        generator = None
+        needs_session = (
+            self.finder_request_repo is None
+            or self.price_observation_repo is None
+            or self.distance_observation_repo is None
+        )
+        if needs_session:
+            session, generator = open_session(self._session_factory)
 
-        candidates = command.candidate_house_platform_ids
-        if candidates is None:
-            if not self.filter_usecase:
-                raise ValueError("filter_usecase가 필요합니다.")
-            filter_result = self.filter_usecase.execute(
-                FilterCandidateCommand(
-                    finder_request_id=command.finder_request_id
-                )
+        runtime_finder_repo = self.finder_request_repo or FinderRequestRepository(
+            session
+        )
+        runtime_price_repo = (
+            self.price_observation_repo
+            or StudentRecommendationPriceObservationRepository(session)
+        )
+        runtime_distance_repo = (
+            self.distance_observation_repo
+            or StudentRecommendationDistanceObservationRepository(session)
+        )
+        runtime_observation_repo = (
+            self.observation_repo
+            or StudentRecommendationFeatureObservationRepository(
+                self._session_factory
             )
-            candidates = [
-                candidate.house_platform_id
-                for candidate in filter_result.candidates
+        )
+        runtime_score_repo = self.score_repo or StudentHouseScoreRepository(
+            self._session_factory
+        )
+        runtime_house_platform_repo = (
+            self.house_platform_repo
+            or HousePlatformRepository(self._session_factory)
+        )
+        runtime_university_repo = (
+            self.university_repo
+            or UniversityRepository(self._session_factory)
+        )
+        runtime_filter_usecase = self.filter_usecase or FilterCandidateService(
+            finder_request_repo=runtime_finder_repo,
+            house_platform_repo=HousePlatformCandidateRepository(
+                self._session_factory
+            ),
+            price_observation_repo=runtime_price_repo,
+            distance_observation_repo=runtime_distance_repo,
+            university_repo=runtime_university_repo,
+        )
+        runtime_context_signal_usecase = (
+            self.build_context_signal_usecase
+            or BuildDecisionContextSignalUseCase(
+                observation_repo=runtime_observation_repo
+            )
+        )
+
+        # finder_request는 상위 흐름에서 존재를 보장한다.
+        request = runtime_finder_repo.find_by_id(command.finder_request_id)
+
+        previous = (
+            self.finder_request_repo,
+            self.house_platform_repo,
+            self.observation_repo,
+            self.score_repo,
+            self.price_observation_repo,
+            self.distance_observation_repo,
+            self.university_repo,
+            self.filter_usecase,
+            self.build_context_signal_usecase,
+        )
+        self.finder_request_repo = runtime_finder_repo
+        self.house_platform_repo = runtime_house_platform_repo
+        self.observation_repo = runtime_observation_repo
+        self.score_repo = runtime_score_repo
+        self.price_observation_repo = runtime_price_repo
+        self.distance_observation_repo = runtime_distance_repo
+        self.university_repo = runtime_university_repo
+        self.filter_usecase = runtime_filter_usecase
+        self.build_context_signal_usecase = runtime_context_signal_usecase
+
+        try:
+            candidates = command.candidate_house_platform_ids
+            if candidates is None:
+                filter_result = self.filter_usecase.execute(
+                    FilterCandidateCommand(
+                        finder_request_id=command.finder_request_id
+                    )
+                )
+                candidates = [
+                    candidate.house_platform_id
+                    for candidate in filter_result.candidates
+                ]
+
+            if self.build_context_signal_usecase and candidates:
+                self.build_context_signal_usecase.execute_with_candidates(
+                    candidates
+                )
+
+            policy = self.policy
+            score_map = self._fetch_score_map(
+                candidates,
+                policy,
+            )
+            ranked = [
+                (
+                    house_platform_id,
+                    score_map.get(house_platform_id),
+                    self._resolve_base_score(
+                        score_map.get(house_platform_id)
+                    ),
+                )
+                for house_platform_id in candidates
             ]
 
-        if self.build_context_signal_usecase and candidates:
-            self.build_context_signal_usecase.execute_with_candidates(
-                candidates
-            )
+            recommended = [
+                item
+                for item in ranked
+                if item[2] >= policy.threshold_base_total
+            ]
+            rejected = [
+                item
+                for item in ranked
+                if item[2] < policy.threshold_base_total
+            ]
 
-        policy = self.policy
-        score_map = self._fetch_score_map(
-            candidates,
-            policy,
-        )
-        ranked = [
+            recommended.sort(key=lambda item: item[2], reverse=True)
+            rejected.sort(key=lambda item: item[2], reverse=True)
+
+            recommended_top = recommended[: policy.top_k]
+            rejected_top = rejected[: policy.top_k]
+
+            # 정상 응답은 SUCCESS + detail None으로 기록한다.
+            # TODO: 실패 수집 로직 활성화 시 FAILED + detail 채움으로 전환한다.
+            status = "SUCCESS"
+            detail = None
+            # TODO: 추천 로직이 안정화되면 실패 상세를 활성화한다.
+            # detail = self._collect_failure_detail(
+            #     candidates=candidates,
+            #     score_map=score_map,
+            # )
+            # if detail:
+            #     status = "FAILED"
+
+            result = RecommendStudentHouseResult(
+                finder_request_id=command.finder_request_id,
+                generated_at=datetime.now(timezone.utc).isoformat(),
+                status=status,
+                detail=detail,
+                query_context=self._build_query_context(request, policy),
+                summary=self._build_summary(
+                    total_candidates=len(candidates),
+                    recommended_count=len(recommended),
+                    rejected_count=len(rejected),
+                    top_k=policy.top_k,
+                ),
+                recommended_top_k=self._build_ranked_items(
+                    recommended_top,
+                    request,
+                    policy,
+                    decision_status="RECOMMENDED",
+                ),
+                rejected_top_k=self._build_ranked_items(
+                    rejected_top,
+                    request,
+                    policy,
+                    decision_status="REJECTED",
+                ),
+            )
+            return result
+        finally:
             (
-                house_platform_id,
-                score_map.get(house_platform_id),
-                self._resolve_base_score(score_map.get(house_platform_id)),
-            )
-            for house_platform_id in candidates
-        ]
-
-        recommended = [item for item in ranked if item[2] >= policy.threshold_base_total]
-        rejected = [item for item in ranked if item[2] < policy.threshold_base_total]
-
-        recommended.sort(key=lambda item: item[2], reverse=True)
-        rejected.sort(key=lambda item: item[2], reverse=True)
-
-        recommended_top = recommended[: policy.top_k]
-        rejected_top = rejected[: policy.top_k]
-
-        # 정상 응답은 SUCCESS + detail None으로 기록한다.
-        # TODO: 실패 수집 로직 활성화 시 FAILED + detail 채움으로 전환한다.
-        status = "SUCCESS"
-        detail = None
-        # TODO: 추천 로직이 안정화되면 실패 상세를 활성화한다.
-        # detail = self._collect_failure_detail(
-        #     candidates=candidates,
-        #     score_map=score_map,
-        # )
-        # if detail:
-        #     status = "FAILED"
-
-        result = RecommendStudentHouseResult(
-            finder_request_id=command.finder_request_id,
-            generated_at=datetime.now(timezone.utc).isoformat(),
-            status=status,
-            detail=detail,
-            query_context=self._build_query_context(request, policy),
-            summary=self._build_summary(
-                total_candidates=len(candidates),
-                recommended_count=len(recommended),
-                rejected_count=len(rejected),
-                top_k=policy.top_k,
-            ),
-            recommended_top_k=self._build_ranked_items(
-                recommended_top,
-                request,
-                policy,
-                decision_status="RECOMMENDED",
-            ),
-            rejected_top_k=self._build_ranked_items(
-                rejected_top,
-                request,
-                policy,
-                decision_status="REJECTED",
-            ),
-        )
-        return result
+                self.finder_request_repo,
+                self.house_platform_repo,
+                self.observation_repo,
+                self.score_repo,
+                self.price_observation_repo,
+                self.distance_observation_repo,
+                self.university_repo,
+                self.filter_usecase,
+                self.build_context_signal_usecase,
+            ) = previous
+            if generator:
+                generator.close()
+            elif session is not None:
+                session.close()
 
     def _fetch_score_map(
         self,
