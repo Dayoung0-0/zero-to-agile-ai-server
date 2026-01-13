@@ -117,6 +117,5 @@ def start_search_house_consumer():
     print("[Consumer] search.house.request consuming start")
     channel.start_consuming()
 
-
 if __name__ == "__main__":
     start_search_house_consumer()
