@@ -319,12 +319,12 @@ class RecommendStudentHouseUseCase(RecommendStudentHousePort):
 
             if decision_status == "RECOMMENDED":
                 item["ai_explanation"] = {
-                    "reasons_top3": [],
+                    "recommended_reasons": [],
                     "warnings": self._build_warnings(version_mismatch),
                 }
                 # TODO: explain_by_feature_observations_usecase 연동 시 실제 설명을 채운다.
             else:
-                item["reject_reasons"] = [
+                reject_reasons = [
                     {
                         "code": "SCORE_BELOW_THRESHOLD",
                         "text": "점수 기준 미달로 제외되었습니다.",
@@ -336,8 +336,9 @@ class RecommendStudentHouseUseCase(RecommendStudentHousePort):
                         },
                     }
                 ]
-                item["explanation"] = {
-                    "reasons_top3": [],
+                item["reject_reasons"] = reject_reasons
+                item["ai_explanation"] = {
+                    "reject_reasons": reject_reasons,
                     "warnings": self._build_reject_warnings(
                         version_mismatch
                     ),
